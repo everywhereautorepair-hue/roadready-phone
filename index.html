@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b3b49" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <title>RoadReady — Mobile Mechanic Operations</title>
+  <style>
+    :root {
+      --ink: #17232d;
+      --muted: #6a7883;
+      --surface: #ffffff;
+      --canvas: #f5f7f7;
+      --line: #e2e7e8;
+      --nav: #0d1d26;
+      --teal: #087e75;
+      --teal-dark: #05635c;
+      --teal-pale: #e6f5f1;
+      --amber: #b86b00;
+      --amber-pale: #fff3dd;
+      --red: #b23b3b;
+      --red-pale: #fff0ef;
+      --shadow: 0 10px 30px rgba(22, 39, 48, .08);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--canvas); font: 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 246px minmax(0, 1fr); }
+    .sidebar { background: var(--nav); color: #d9e4e6; padding: 26px 14px 18px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 27px; color: white; font-weight: 750; letter-spacing: -.3px; }
+    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #17a99a; color: #052722; font-size: 18px; }
+    .brand small { display: block; margin-top: 1px; color: #91a5aa; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+    .nav-label { padding: 0 10px 8px; color: #7f969b; font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    .nav { display: grid; gap: 3px; }
+    .nav button { border: 0; color: #cbd8da; background: transparent; border-radius: 9px; padding: 11px 10px; display: flex; align-items: center; gap: 10px; font-weight: 600; text-align: left; }
+    .nav button:hover { background: #17313c; color: white; }
+    .nav button.active { background: #1b4149; color: #fff; }
+    .nav-icon { width: 18px; text-align: center; color: #74d8ce; }
+    .sidebar-footer { margin-top: auto; border-top: 1px solid #28404a; padding: 16px 10px 0; display: flex; gap: 9px; align-items: center; }
+    .avatar { width: 31px; height: 31px; border-radius: 50%; display: grid; place-items: center; background: #2b6d72; color: white; font-size: 12px; font-weight: 800; }
+    .sidebar-footer div { min-width: 0; }
+    .sidebar-footer strong, .sidebar-footer span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-footer strong { color: white; font-size: 13px; }
+    .sidebar-footer span { color: #8aa0a5; font-size: 11px; }
+    main { min-width: 0; }
+    .topbar { min-height: 76px; padding: 18px 32px; background: rgba(255,255,255,.88); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 18px; position: sticky; z-index: 5; top: 0; backdrop-filter: blur(10px); }
+    .page-title h1 { margin: 0; font-size: 21px; letter-spacing: -.5px; }
+    .page-title p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+    .top-actions, .row-actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+    .btn { border: 1px solid var(--line); padding: 9px 13px; border-radius: 8px; background: white; color: var(--ink); font-weight: 700; font-size: 13px; transition: .15s ease; white-space: nowrap; }
+    .btn:hover { border-color: #b8c8c9; transform: translateY(-1px); }
+    .btn.primary { background: var(--teal); border-color: var(--teal); color: white; }
+    .btn.primary:hover { background: var(--teal-dark); }
+    .btn.subtle { background: transparent; }
+    .btn.danger { color: var(--red); border-color: #f3cfca; }
+    .content { max-width: 1420px; margin: 0 auto; padding: 28px 32px 52px; }
+    .section-head { display: flex; justify-content: space-between; align-items: end; margin-bottom: 17px; gap: 15px; }
+    .section-head h2 { margin: 0; font-size: 17px; letter-spacing: -.25px; }
+    .section-head p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+    .today { color: var(--muted); font-size: 13px; font-weight: 650; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+    .stat, .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 1px 0 rgba(31,47,54,.02); }
+    .stat { padding: 18px; }
+    .stat .label { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .stat .metric { margin-top: 4px; font-size: 25px; font-weight: 780; letter-spacing: -1px; }
+    .stat .sub { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .dashboard-grid { display: grid; grid-template-columns: minmax(430px, 1.45fr) minmax(300px, .8fr); gap: 18px; }
+    .card { overflow: hidden; }
+    .card-head { padding: 17px 18px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
+    .card-head h3 { margin: 0; font-size: 14px; letter-spacing: -.15px; }
+    .card-head a { color: var(--teal); font-weight: 750; font-size: 12px; text-decoration: none; cursor: pointer; }
+    .appointment { display: grid; grid-template-columns: 66px 1fr auto; align-items: center; gap: 13px; padding: 15px 18px; border-bottom: 1px solid #edf0f1; }
+    .appointment:last-child { border-bottom: 0; }
+    .time { color: var(--teal-dark); font-size: 13px; font-weight: 800; }
+    .appointment h4 { margin: 0; font-size: 13px; }
+    .appointment p { margin: 2px 0 0; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pill { display: inline-flex; align-items: center; border-radius: 30px; padding: 4px 8px; font-size: 11px; font-weight: 750; white-space: nowrap; }
+    .pill.scheduled { background: #e8f1fd; color: #346394; }
+    .pill.confirmed { background: var(--teal-pale); color: var(--teal-dark); }
+    .pill.approval { background: var(--amber-pale); color: var(--amber); }
+    .pill.invoice { background: var(--red-pale); color: var(--red); }
+    .quick-actions { padding: 11px; display: grid; gap: 7px; }
+    .quick { padding: 13px; border: 1px solid transparent; border-radius: 9px; background: #f9fbfb; text-align: left; display: flex; align-items: center; justify-content: space-between; color: var(--ink); }
+    .quick:hover { border-color: #cfdfdf; background: #f3fbf9; }
+    .quick strong { display: block; font-size: 13px; }
+    .quick span { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
+    .quick b { color: var(--teal); font-size: 18px; }
+    .notice { margin: 11px; padding: 13px; border-radius: 8px; color: #72500b; background: #fff8e9; font-size: 12px; }
+    .notice strong { color: #5b3c00; }
+    .workspace { display: grid; grid-template-columns: minmax(300px, .85fr) minmax(420px, 1.25fr); gap: 18px; }
+    .list { padding: 8px; }
+    .list-item { width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 13px 11px; border-radius: 8px; display: grid; grid-template-columns: 58px 1fr; gap: 10px; color: var(--ink); }
+    .list-item:hover, .list-item.selected { background: #f2f9f8; border-color: #d7e9e6; }
+    .list-item .date { color: var(--teal-dark); font-size: 11px; line-height: 1.2; padding-top: 2px; font-weight: 800; text-transform: uppercase; }
+    .list-item h4 { margin: 0; font-size: 13px; }
+    .list-item p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+    .detail { padding: 21px; }
+    .detail-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .detail-top h2 { margin: 0; font-size: 19px; letter-spacing: -.4px; }
+    .detail-top p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 17px 0; }
+    .info { border: 1px solid #e8eeee; border-radius: 8px; padding: 11px; background: #fbfcfc; }
+    .info label { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .info div { margin-top: 2px; font-size: 13px; font-weight: 650; }
+    .detail-section { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+    .detail-section h3 { margin: 0 0 9px; font-size: 12px; text-transform: uppercase; color: #53636c; letter-spacing: .06em; }
+    .line-item { display: flex; align-items: baseline; justify-content: space-between; padding: 7px 0; font-size: 13px; }
+    .line-item span { color: var(--muted); }
+    .total { border-top: 1px dashed #ced9da; margin-top: 5px; padding-top: 9px; color: var(--ink); font-size: 15px; font-weight: 800; }
+    .manual-banner { padding: 12px 13px; border-radius: 8px; background: var(--teal-pale); color: #075f58; font-size: 12px; }
+    .schedule-table { width: 100%; border-collapse: collapse; }
+    .schedule-table th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 0 12px 10px; }
+    .schedule-table td { padding: 14px 12px; border-top: 1px solid #eef1f1; font-size: 13px; vertical-align: middle; }
+    .schedule-table .customer { font-weight: 750; }
+    .schedule-table small { display: block; color: var(--muted); margin-top: 2px; font-size: 11px; }
+    .mini-link { padding: 6px 8px; border: 1px solid #dce7e6; border-radius: 6px; background: white; color: var(--teal-dark); font-size: 11px; font-weight: 750; }
+    .report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .report-card { padding: 18px; }
+    .report-card h3 { margin: 0; color: var(--muted); font-size: 12px; }
+    .report-card .number { margin: 8px 0 2px; font-size: 25px; font-weight: 800; letter-spacing: -.7px; }
+    .report-card p { margin: 0; color: var(--muted); font-size: 12px; }
+    .bar-chart { display: grid; grid-template-columns: repeat(6, 1fr); align-items: end; gap: 10px; height: 188px; padding: 25px 6px 2px; }
+    .bar-wrap { display: grid; grid-template-rows: 1fr auto; gap: 6px; height: 100%; text-align: center; color: var(--muted); font-size: 10px; }
+    .bar { align-self: end; min-height: 12px; border-radius: 5px 5px 2px 2px; background: #39a99d; }
+    .settings-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .settings-card { padding: 19px; }
+    .settings-card h3 { margin: 0 0 4px; font-size: 15px; }
+    .settings-card p { color: var(--muted); margin: 0 0 16px; font-size: 12px; }
+    .role { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+    .role strong { display: block; font-size: 13px; }
+    .role span { color: var(--muted); font-size: 11px; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; background: #c0cdce; }
+    .status-dot.on { background: #27a87e; box-shadow: 0 0 0 3px #e4f7ef; }
+    .empty { padding: 36px 20px; color: var(--muted); text-align: center; font-size: 13px; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(7, 19, 25, .5); display: none; align-items: center; justify-content: center; padding: 18px; }
+    .modal-backdrop.show { display: flex; }
+    .modal { width: min(620px, 100%); max-height: min(760px, calc(100vh - 36px)); overflow: auto; background: white; border-radius: 14px; box-shadow: 0 24px 70px rgba(1,11,16,.35); }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+    .modal-head h2 { margin: 0; font-size: 18px; letter-spacing: -.35px; }
+    .close { padding: 3px 8px; color: #6e7e84; border: 0; background: transparent; font-size: 22px; line-height: 1; }
+    .modal-body { padding: 19px 20px 21px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 13px; }
+    .field { display: grid; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: #4b5a62; font-size: 11px; font-weight: 800; }
+    .field input, .field select, .field textarea { width: 100%; border: 1px solid #d3dfe0; outline: 0; border-radius: 7px; padding: 9px 10px; color: var(--ink); background: #fff; }
+    .field textarea { resize: vertical; min-height: 86px; }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: #43a89d; box-shadow: 0 0 0 3px rgba(31,155,143,.12); }
+    .modal-foot { display: flex; justify-content: flex-end; gap: 9px; margin-top: 19px; }
+    .template { border-radius: 8px; background: #f5f8f8; padding: 12px; margin-top: 8px; color: #34434a; font-size: 13px; white-space: pre-wrap; }
+    .toast { position: fixed; z-index: 30; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: #122c33; color: white; padding: 11px 15px; border-radius: 8px; font-size: 13px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: .2s; }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+    .auth-gate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 18px; background: #0d1d26; }
+    .auth-card { width: min(430px, 100%); padding: 26px; background: white; border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.36); }
+    .auth-brand { display:flex;align-items:center;gap:10px;margin-bottom:20px;font-weight:800;font-size:18px; }
+    .auth-brand .brand-mark { flex:0 0 auto; }
+    .auth-card h1 { margin:0; font-size:21px; letter-spacing:-.45px; }
+    .auth-card p { margin:6px 0 20px; color:var(--muted); font-size:13px; }
+    .form-message { min-height:18px; margin:9px 0 0; color:var(--red); font-size:12px; }
+    .hide { display: none !important; }
+    @media (max-width: 1050px) { .stats { grid-template-columns: repeat(2, 1fr); } .dashboard-grid, .workspace { grid-template-columns: 1fr; } .settings-layout { grid-template-columns: 1fr; } }
+    @media (max-width: 720px) { .app { display: block; } .sidebar { position: sticky; top: 0; z-index: 15; height: auto; padding: 9px 10px; flex-direction: row; align-items: center; overflow-x: auto; } .brand { padding: 0 8px 0 2px; min-width: max-content; } .brand small, .nav-label, .sidebar-footer { display: none; } .nav { display: flex; gap: 3px; } .nav button { padding: 8px 9px; font-size: 0; } .nav-icon { font-size: 16px; } .topbar { min-height: 67px; padding: 13px 16px; } .page-title p { display: none; } .top-actions .btn.subtle { display: none; } .content { padding: 20px 15px 40px; } .stats { gap: 9px; margin-bottom: 20px; } .stat { padding: 14px; } .stat .metric { font-size: 21px; } .schedule-table th:nth-child(3), .schedule-table td:nth-child(3), .schedule-table th:nth-child(4), .schedule-table td:nth-child(4) { display: none; } .form-grid, .detail-grid, .report-grid { grid-template-columns: 1fr; } .appointment { grid-template-columns: 48px 1fr; } .appointment .pill { display: none; } .top-actions { justify-content: end; } .btn { padding: 8px 10px; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">↗</div><div>RoadReady<small>Mobile Service Ops</small></div></div>
+      <div class="nav-label">Workspace</div>
+      <nav class="nav" aria-label="Main navigation">
+        <button class="active" data-view="dashboard"><span class="nav-icon">▦</span>Dashboard</button>
+        <button data-view="schedule"><span class="nav-icon">◷</span>Schedule</button>
+        <button data-view="jobs"><span class="nav-icon">▣</span>Jobs</button>
+        <button data-view="customers"><span class="nav-icon">♙</span>Customers</button>
+        <button data-view="reports"><span class="nav-icon">▥</span>Reports</button>
+        <button data-view="settings"><span class="nav-icon">⚙</span>Team &amp; settings</button>
+      </nav>
+      <div class="sidebar-footer"><div class="avatar">MK</div><div><strong>Owner account</strong><span>Service advisor</span></div></div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div class="page-title"><h1 id="pageTitle">Good morning</h1><p id="pageSubtitle">Here’s what your mobile service business needs today.</p></div>
+        <div class="top-actions"><button class="btn subtle" id="textCustomer">✉ Text customer</button><button class="btn primary" id="newAppointment">+ New appointment</button></div>
+      </header>
+      <div class="content">
+        <section id="dashboardView" class="view">
+          <div class="section-head"><div><h2>Today at a glance</h2><p>Keep the day moving, without a front desk.</p></div><span class="today" id="todayLabel"></span></div>
+          <div class="stats" id="stats"></div>
+          <div class="dashboard-grid">
+            <article class="card"><div class="card-head"><h3>Today’s stops</h3><a data-go="schedule">Open schedule →</a></div><div id="todayStops"></div></article>
+            <div>
+            <article class="card"><div class="card-head"><h3>Quick actions</h3></div><div class="quick-actions"><button class="quick" id="quickEstimate"><span><strong>Request estimate approval</strong><span>Review, then open Messages</span></span><b>›</b></button><button class="quick" id="quickPayment"><span><strong>Take a payment</strong><span>At the vehicle or send details by text</span></span><b>›</b></button><button class="quick" id="quickNavigate"><span><strong>Navigate to customer</strong><span>Open the next stop in Google Maps</span></span><b>›</b></button></div></article>
+              <div class="notice"><strong>Texts are always manual.</strong> RoadReady opens your phone’s Messages app with the customer and draft message ready; you review it and tap <em>Send</em> yourself.</div>
+            </div>
+          </div>
+        </section>
+
+        <section id="scheduleView" class="view hide">
+          <div class="section-head"><div><h2>Appointment schedule</h2><p>Advisor-led booking. Customers don’t book themselves.</p></div><button class="btn primary" data-action="new">+ New appointment</button></div>
+          <article class="card"><div style="overflow:auto"><table class="schedule-table"><thead><tr><th>Time</th><th>Customer &amp; vehicle</th><th>Service address</th><th>Assigned to</th><th>Status</th><th></th></tr></thead><tbody id="scheduleRows"></tbody></table></div></article>
+        </section>
+
+        <section id="jobsView" class="view hide">
+          <div class="section-head"><div><h2>Jobs &amp; work orders</h2><p>Open the job, navigate to the customer, then complete and collect.</p></div><button class="btn" id="newJobText">Text customer</button></div>
+          <div class="workspace"><article class="card"><div class="card-head"><h3>Active jobs</h3><span class="pill scheduled" id="activeCount"></span></div><div class="list" id="jobList"></div></article><article class="card" id="jobDetail"></article></div>
+        </section>
+
+        <section id="customersView" class="view hide">
+          <div class="section-head"><div><h2>Customers &amp; vehicles</h2><p>Full history stays with the customer—whether one tech or a larger team.</p></div><button class="btn primary" id="newCustomer">+ Add customer</button></div>
+          <article class="card"><div style="overflow:auto"><table class="schedule-table"><thead><tr><th>Customer</th><th>Phone</th><th>Vehicle</th><th>Last service</th><th>Balance</th><th></th></tr></thead><tbody id="customerRows"></tbody></table></div></article>
+        </section>
+
+        <section id="reportsView" class="view hide">
+          <div class="section-head"><div><h2>Business reports</h2><p>Keep a clear picture now; these records are ready for QuickBooks later.</p></div><button class="btn" id="exportReport">Export report</button></div>
+          <div class="report-grid" id="reportStats"></div>
+          <article class="card" style="margin-top:18px"><div class="card-head"><h3>Collected revenue — last 6 months</h3><span style="font-size:11px;color:var(--muted)">Updates as payments are recorded</span></div><div style="padding:0 20px 18px"><div class="bar-chart" id="barChart"></div></div></article>
+          <article class="card" style="margin-top:18px"><div class="card-head"><h3>QuickBooks readiness</h3><span class="pill confirmed">Ready when you are</span></div><div style="padding:18px;display:grid;gap:9px;font-size:13px"><div>✓ Customer records include names, addresses, phones, and vehicles.</div><div>✓ Invoices preserve labor, parts, taxes, payment method, and payment status.</div><div>✓ No bookkeeping service selected yet—connect and map it when you choose one.</div></div></article>
+        </section>
+
+        <section id="settingsView" class="view hide">
+          <div class="section-head"><div><h2>Team &amp; settings</h2><p>Set up for you now, and service advisors and technicians when you hire.</p></div><button class="btn primary" id="addTeam">+ Add team member</button></div>
+          <div class="settings-layout"><article class="card settings-card"><h3>Access roles</h3><p>Everyone sees only the work they need.</p><div class="role"><div><strong>Owner</strong><span>Full business, financial, and team access</span></div><div class="status-dot on"></div></div><div class="role"><div><strong>Service advisor</strong><span>Books calls, reviews texts, manages jobs</span></div><div class="status-dot"></div></div><div class="role"><div><strong>Technician</strong><span>Sees assigned jobs, navigation, work details, photos</span></div><div class="status-dot"></div></div></article><article class="card settings-card"><h3>Connections</h3><p>Use your own phone now; add services later when they help.</p><div class="role"><div><strong>Phone texting</strong><span>Uses your phone’s Messages app. You review every message before sending.</span></div><button class="mini-link" id="phoneTextInfo">How it works</button></div><div class="role"><div><strong>QuickBooks</strong><span>Not connected — records are already structured for setup</span></div><button class="mini-link" id="qbInfo">Prepare</button></div><div class="role"><div><strong>Payments</strong><span>Card at vehicle and payment links available to set up later</span></div><button class="mini-link" id="paymentInfo">Set up</button></div></article></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal"><div class="modal-head"><h2 id="modalTitle">New appointment</h2><button class="close" aria-label="Close" id="closeModal">×</button></div><div class="modal-body" id="modalBody"></div></div></div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const storageKey = 'roadready-mobile-ops-v2';
+    const seed = {
+      appointments: [],
+      messages: [],
+      payments: []
+    };
+    let data;
+    try { data = JSON.parse(localStorage.getItem(storageKey)) || seed; } catch { data = seed; }
+    let selectedId = data.appointments[0]?.id;
+    let currentView = 'dashboard';
+    const dollar = n => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n || 0));
+    const today = '2026-09-08';
+    const escape = value => String(value ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[c]);
+    const save = () => localStorage.setItem(storageKey, JSON.stringify(data));
+    const getSelected = () => data.appointments.find(a => a.id === selectedId) || data.appointments[0];
+    const appointmentOrder = (a, b) => {
+      const minutes = value => { const match = String(value).match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i); if (!match) return 0; let hours = Number(match[1]) % 12; if (match[3].toUpperCase() === 'PM') hours += 12; return hours * 60 + Number(match[2]); };
+      return a.date === b.date ? minutes(a.time) - minutes(b.time) : a.date.localeCompare(b.date);
+    };
+    const openMaps = a => { if (!a) return; window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(a.address), '_blank', 'noopener'); };
+    const toast = message => { const el = document.getElementById('toast'); el.textContent = message; el.classList.add('show'); clearTimeout(window.toastTimer); window.toastTimer = setTimeout(() => el.classList.remove('show'), 2900); };
+    const statusClass = status => status === 'Confirmed' ? 'confirmed' : status === 'Needs approval' ? 'approval' : status === 'Paid' ? 'confirmed' : 'scheduled';
+    function navigate(view) {
+      currentView = view;
+      document.querySelectorAll('.view').forEach(el => el.classList.toggle('hide', el.id !== view + 'View'));
+      document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+      const titles = {
+        dashboard: ['Good morning', 'Here’s what your mobile service business needs today.'],
+        schedule: ['Appointment schedule', 'Appointments are entered and managed by your advisor team.'],
+        jobs: ['Jobs & work orders', 'Keep each service call moving from arrival to payment.'],
+        customers: ['Customers & vehicles', 'Every customer’s history is ready for the next visit.'],
+        reports: ['Business reports', 'Simple reporting now, clean bookkeeping when you choose it.'],
+        settings: ['Team & settings', 'Built to grow from one person to a full mobile service team.']
+      };
+      document.getElementById('pageTitle').textContent = titles[view][0]; document.getElementById('pageSubtitle').textContent = titles[view][1];
+      if (view === 'jobs') renderJobs();
+      if (view === 'schedule') renderSchedule();
+      if (view === 'customers') renderCustomers();
+      if (view === 'reports') renderReports();
+    }
+    function renderDashboard() {
+      const appointmentsToday = data.appointments.filter(a => a.date === today);
+      const collected = data.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const unpaid = data.appointments.reduce((sum, a) => sum + Math.max(0, a.total - a.paid), 0);
+      const needsApproval = data.appointments.filter(a => a.status === 'Needs approval').length;
+      document.getElementById('todayLabel').textContent = new Date(today + 'T12:00:00').toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+      document.getElementById('stats').innerHTML = [
+        ['Today’s stops', appointmentsToday.length, appointmentsToday.length ? appointmentsToday.length + ' appointments booked' : 'No stops booked'],
+        ['Collected this month', dollar(collected), 'Payments recorded'],
+        ['Unpaid invoices', dollar(unpaid), 'Across active jobs'],
+        ['Needs approval', needsApproval, needsApproval ? 'Estimate waiting on customer' : 'No estimates waiting']
+      ].map(x => `<article class="stat"><div class="label">${x[0]}</div><div class="metric">${x[1]}</div><div class="sub">${x[2]}</div></article>`).join('');
+      document.getElementById('todayStops').innerHTML = appointmentsToday.length ? appointmentsToday.map(a => `<div class="appointment"><div class="time">${escape(a.time)}</div><div><h4>${escape(a.customer)} <span style="color:#9aa8ad;font-weight:600">· ${escape(a.vehicle)}</span></h4><p>${escape(a.service)} · ${escape(a.address)}</p></div><span class="pill ${statusClass(a.status)}">${escape(a.status)}</span></div>`).join('') : '<div class="empty">No appointments for today.</div>';
+    }
+    function renderSchedule() {
+      const rows = [...data.appointments].sort(appointmentOrder);
+      document.getElementById('scheduleRows').innerHTML = rows.map(a => `<tr><td><strong>${escape(a.time)}</strong><small>${new Date(a.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</small></td><td><span class="customer">${escape(a.customer)}</span><small>${escape(a.vehicle)} · ${escape(a.service)}</small></td><td>${escape(a.address)}</td><td>${escape(a.tech || 'Unassigned')}</td><td><span class="pill ${statusClass(a.status)}">${escape(a.status)}</span></td><td><button class="mini-link" data-open-job="${a.id}">Open</button></td></tr>`).join('');
+    }
+    function renderJobs() {
+      const active = [...data.appointments].filter(a => a.status !== 'Paid').sort(appointmentOrder);
+      document.getElementById('activeCount').textContent = active.length + ' active';
+      document.getElementById('jobList').innerHTML = active.length ? active.map(a => `<button class="list-item ${a.id === selectedId ? 'selected':''}" data-select-job="${a.id}"><span class="date">${new Date(a.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}<br>${escape(a.time)}</span><span><h4>${escape(a.customer)} · ${escape(a.vehicle)}</h4><p>${escape(a.service)}</p></span></button>`).join('') : '<div class="empty">No active jobs right now.</div>';
+      renderJobDetail();
+    }
+    function renderJobDetail() {
+      const a = getSelected(); const el = document.getElementById('jobDetail');
+      if (!a) { el.innerHTML = '<div class="empty">Select a job to see its work order.</div>'; return; }
+      const balance = Math.max(0, a.total - a.paid);
+      const labor = Math.max(0, a.total - a.parts - Number(a.tax || 0));
+      el.innerHTML = `<div class="detail"><div class="detail-top"><div><h2>${escape(a.customer)}</h2><p>${escape(a.vehicle)} · ${escape(a.service)}</p></div><span class="pill ${statusClass(a.status)}">${escape(a.status)}</span></div><div class="row-actions"><button class="btn primary" data-nav-selected>⌖ Navigate to customer</button><button class="btn" data-text-selected>Text customer</button></div><div class="detail-grid"><div class="info"><label>Appointment</label><div>${new Date(a.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${escape(a.time)}</div></div><div class="info"><label>Assigned technician</label><div>${escape(a.tech || 'Unassigned')}</div></div><div class="info"><label>Phone</label><div>${escape(a.phone)}</div></div><div class="info"><label>Service address</label><div>${escape(a.address)}</div></div></div><div class="manual-banner">Customer texts require advisor review. Use a template, edit it if needed, then open your phone’s Messages app and tap Send yourself.</div><div class="detail-section"><h3>Estimate &amp; invoice</h3><div class="line-item"><span>Parts from local supplier</span><strong>${dollar(a.parts)}</strong></div><div class="line-item"><span>Labor &amp; service</span><strong>${dollar(labor)}</strong></div><div class="line-item"><span>Tax</span><strong>${dollar(a.tax)}</strong></div><div class="line-item total"><span>Total</span><strong>${dollar(a.total)}</strong></div><div class="line-item"><span>Paid</span><strong>${dollar(a.paid)}</strong></div><div class="line-item"><span>Balance due</span><strong>${dollar(balance)}</strong></div></div><div class="detail-section"><h3>Advisor notes</h3><p style="font-size:13px;margin:0;color:#45545b">${escape(a.notes || 'No notes on this job yet.')}</p></div><div class="row-actions" style="margin-top:18px"><button class="btn" data-approval-selected>Request approval by text</button><button class="btn primary" data-payment-selected>${balance ? 'Collect payment' : 'Mark complete'}</button></div></div>`;
+    }
+    function renderCustomers() {
+      const customers = [...data.appointments].reduce((out, a) => { if (!out[a.customer]) out[a.customer] = { ...a, balance: 0, latest: a.date }; out[a.customer].balance += Math.max(0,a.total-a.paid); if (a.date > out[a.customer].latest) out[a.customer].latest=a.date; return out; }, {});
+      document.getElementById('customerRows').innerHTML = Object.values(customers).map(a => `<tr><td><span class="customer">${escape(a.customer)}</span><small>${escape(a.address)}</small></td><td>${escape(a.phone)}</td><td>${escape(a.vehicle)}</td><td>${new Date(a.latest+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td><td>${a.balance ? `<span style="color:var(--amber);font-weight:750">${dollar(a.balance)}</span>` : '<span style="color:var(--teal);font-weight:750">Paid</span>'}</td><td><button class="mini-link" data-open-customer="${a.id}">View job</button></td></tr>`).join('');
+    }
+    function renderReports() {
+      const collected = data.payments.reduce((s,p)=>s+Number(p.amount),0); const invoiced = data.appointments.reduce((s,a)=>s+Number(a.total),0); const parts = data.appointments.reduce((s,a)=>s+Number(a.parts),0); const outstanding = Math.max(0,invoiced-collected);
+      document.getElementById('reportStats').innerHTML = [['Collected revenue', dollar(collected), 'Payments recorded in the app'], ['Parts cost', dollar(parts), 'Recorded vendor parts'], ['Outstanding', dollar(outstanding), 'Open balances to collect']].map(x=>`<article class="card report-card"><h3>${x[0]}</h3><div class="number">${x[1]}</div><p>${x[2]}</p></article>`).join('');
+      const points = []; const reference = new Date(today + 'T12:00:00');
+      for (let i = 5; i >= 0; i--) { const date = new Date(reference.getFullYear(), reference.getMonth() - i, 1); points.push({ key: date.toISOString().slice(0,7), label: date.toLocaleDateString('en-US',{month:'short'}), total: 0 }); }
+      data.payments.forEach(payment => { const point = points.find(item => item.key === String(payment.date).slice(0,7)); if (point) point.total += Number(payment.amount || 0); });
+      const max = Math.max(...points.map(p => p.total));
+      document.getElementById('barChart').innerHTML = max === 0 ? '<div style="grid-column:1 / -1;align-self:center;text-align:center;color:var(--muted);font-size:13px">No payments recorded yet. Your revenue trend will appear here as you collect payments.</div>' : points.map(p=>`<div class="bar-wrap"><div class="bar" title="${dollar(p.total)}" style="height:${Math.max(8, Math.round(p.total/max*100))}%"></div><span>${p.label}</span></div>`).join('');
+    }
+    function openModal(title, body) { document.getElementById('modalTitle').textContent=title; document.getElementById('modalBody').innerHTML=body; document.getElementById('modalBackdrop').classList.add('show'); }
+    function closeModal() { document.getElementById('modalBackdrop').classList.remove('show'); }
+    function appointmentForm() { openModal('Book an appointment', `<form id="appointmentForm"><div class="form-grid"><div class="field"><label>Customer name</label><input name="customer" required placeholder="Full name" /></div><div class="field"><label>Phone</label><input name="phone" required placeholder="(555) 555-5555" /></div><div class="field"><label>Vehicle</label><input name="vehicle" required placeholder="Year, make, model" /></div><div class="field"><label>Appointment time</label><input name="time" required placeholder="e.g. 10:30 AM" /></div><div class="field full"><label>Service address</label><input name="address" required placeholder="Street, city, state, ZIP" /></div><div class="field"><label>Date</label><input name="date" type="date" value="${today}" required /></div><div class="field"><label>Assigned technician</label><select name="tech"><option>Owner</option><option>Unassigned</option></select></div><div class="field full"><label>Requested service</label><input name="service" required placeholder="e.g. Battery replacement" /></div><div class="field full"><label>Advisor notes</label><textarea name="notes" placeholder="Customer concern, requested parts, access instructions…"></textarea></div></div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">Save appointment</button></div></form>`); document.getElementById('appointmentForm').addEventListener('submit', e=>{ e.preventDefault(); const f=new FormData(e.currentTarget); const a=Object.fromEntries(f); a.id=Date.now(); a.status='Scheduled'; a.advisor='Owner account'; a.total=0; a.parts=0; a.tax=0; a.paid=0; data.appointments.push(a); selectedId=a.id; save(); renderDashboard(); renderSchedule(); renderJobs(); renderCustomers(); closeModal(); toast('Appointment booked and ready for dispatch.'); }); }
+    function textForm(a=getSelected(), preset='appointment') {
+      if (!a) return toast('Add an appointment first.');
+      const templates={ appointment:`Hi ${a.customer.split(' ')[0]}, this is RoadReady Mobile Service. Your ${a.service} appointment is set for ${a.time}. Reply here if anything changes.`, onway:`Hi ${a.customer.split(' ')[0]}, this is RoadReady Mobile Service. I’m on the way to your ${a.service} appointment now.`, approval:`Hi ${a.customer.split(' ')[0]}, your estimate for ${a.service} is ready. Please reply YES to approve before work begins.`, payment:`Hi ${a.customer.split(' ')[0]}, your invoice balance is ${dollar(Math.max(0,a.total-a.paid))}. Please reply if you would like to pay by card or have a question.` };
+      openModal('Review before opening Messages', `<div class="field"><label>To</label><input value="${escape(a.customer)} · ${escape(a.phone)}" disabled /></div><div class="field" style="margin-top:12px"><label>Template</label><select id="textTemplate"><option value="appointment">Appointment confirmation</option><option value="onway">Technician is on the way</option><option value="approval">Estimate approval request</option><option value="payment">Payment reminder</option></select></div><div class="field" style="margin-top:12px"><label>Message — you can edit before sending</label><textarea id="messageText">${escape(templates[preset] || templates.appointment)}</textarea></div><p style="margin:11px 0 0;color:var(--muted);font-size:11px">RoadReady will open your phone’s Messages app. The text does not send until you personally tap Send there.</p><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" id="openMessages">Open Messages</button></div>`);
+      const select=document.getElementById('textTemplate'); select.value=preset; select.addEventListener('change',()=>document.getElementById('messageText').value=templates[select.value]);
+      document.getElementById('openMessages').addEventListener('click', ()=>{
+        const message=document.getElementById('messageText').value.trim(); if(!message) return toast('Enter a message first.');
+        const recipient=String(a.phone || '').replace(/[^\d+]/g,''); if(!recipient) return toast('Add the customer’s phone number first.');
+        const separator=/iPhone|iPad|iPod/i.test(navigator.userAgent) ? '&' : '?';
+        data.messages.push({appointmentId:a.id,message,date:new Date().toISOString(),status:'opened in phone messages'}); save(); closeModal();
+        window.location.href='sms:'+recipient+separator+'body='+encodeURIComponent(message);
+        toast('Review the draft in Messages, then tap Send.');
+      });
+    }
+    function paymentForm(a=getSelected()) { if (!a) return; const balance=Math.max(0,a.total-a.paid); if (!balance) { a.status='Paid'; save(); renderJobs(); renderDashboard(); return toast('Job marked complete and paid.'); } openModal('Collect payment', `<div class="manual-banner">Choose how the customer pays. The app can later connect this to your payment provider.</div><div class="form-grid" style="margin-top:15px"><div class="field"><label>Customer</label><input value="${escape(a.customer)}" disabled></div><div class="field"><label>Balance due</label><input value="${dollar(balance)}" disabled></div><div class="field"><label>Amount received</label><input id="payAmount" type="number" min="0.01" max="${balance}" step="0.01" value="${balance.toFixed(2)}" /></div><div class="field"><label>Payment method</label><select id="payMethod"><option>Card at vehicle</option><option>Text payment details</option><option>Cash</option><option>Check</option></select></div></div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" id="recordPayment">Record payment</button></div>`); document.getElementById('recordPayment').addEventListener('click',()=>{ const amount=Number(document.getElementById('payAmount').value); if(!amount || amount>balance) return toast('Enter an amount up to the balance due.'); const method=document.getElementById('payMethod').value; if(method==='Text payment details') { closeModal(); textForm(a,'payment'); return; } a.paid=Number(a.paid)+amount; if(a.paid>=a.total) a.status='Paid'; data.payments.push({appointmentId:a.id,amount,method,date:today}); save(); renderDashboard(); renderJobs(); renderReports(); renderCustomers(); closeModal(); toast(dollar(amount)+' recorded by '+method+'.'); }); }
+    function infoModal(type) { const messages={ qb:['QuickBooks connection','When you choose QuickBooks, you’ll connect the account, map your sales and tax accounts, then transfer/sync customers, invoices, payments, and line items. This prototype has the data fields in place; live sync is the next build step.'], payment:['Payment setup','Connect a payment provider when you are ready. It will support a card reader at the vehicle and secure payment links by text, with payment results saved to the matching job.'], phone:['Phone texting','RoadReady fills in the customer and message, then opens your phone’s regular Messages app. You review it there and tap Send yourself. This uses your normal phone number and texting plan.'] }; const [title,body]=messages[type]; openModal(title,`<p style="margin:0;color:#4e5e66;line-height:1.6">${body}</p><div class="modal-foot"><button class="btn primary" data-close>Got it</button></div>`); }
+    function exportReport() { const rows=[['RoadReady Business Report'],['Generated',new Date().toLocaleString()],[],['Customer','Vehicle','Service','Total','Paid','Balance','Status']]; data.appointments.forEach(a=>rows.push([a.customer,a.vehicle,a.service,a.total,a.paid,Math.max(0,a.total-a.paid),a.status])); const csv=rows.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv'}); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='roadready-business-report.csv'; link.click(); URL.revokeObjectURL(link.href); toast('Report exported for your records.'); }
+    document.addEventListener('click', e=>{
+      const nav=e.target.closest('[data-view]'); if(nav) return navigate(nav.dataset.view);
+      const go=e.target.closest('[data-go]'); if(go) return navigate(go.dataset.go);
+      if(e.target.closest('#newAppointment,[data-action="new"]')) return appointmentForm();
+      if(e.target.closest('#closeModal,[data-close]')) return closeModal();
+      if(e.target===document.getElementById('modalBackdrop')) return closeModal();
+      const open=e.target.closest('[data-open-job]'); if(open){ selectedId=Number(open.dataset.openJob); navigate('jobs'); return; }
+      const select=e.target.closest('[data-select-job]'); if(select){ selectedId=Number(select.dataset.selectJob); renderJobs(); return; }
+      const customer=e.target.closest('[data-open-customer]'); if(customer){selectedId=Number(customer.dataset.openCustomer);navigate('jobs');return;}
+      if(e.target.closest('[data-nav-selected],#quickNavigate')) return openMaps(getSelected());
+      if(e.target.closest('[data-text-selected],#textCustomer,#newJobText')) return textForm(getSelected());
+      if(e.target.closest('[data-approval-selected],#quickEstimate')) return textForm(getSelected(),'approval');
+      if(e.target.closest('[data-payment-selected],#quickPayment')) return paymentForm(getSelected());
+      if(e.target.closest('#exportReport')) return exportReport();
+      if(e.target.closest('#newCustomer')) return appointmentForm();
+      if(e.target.closest('#addTeam')) return toast('Team-member invitations are ready for the next build phase.');
+      if(e.target.closest('#phoneTextInfo')) return infoModal('phone');
+      if(e.target.closest('#qbInfo')) return infoModal('qb'); if(e.target.closest('#paymentInfo')) return infoModal('payment');
+    });
+    renderDashboard(); renderSchedule(); renderJobs(); renderCustomers(); renderReports();
+    if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  </script>
+</body>
+</html>

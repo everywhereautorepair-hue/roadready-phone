@@ -1,0 +1,17 @@
+{
+  "name": "RoadReady — Mobile Mechanic Operations",
+  "short_name": "RoadReady",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f7f7",
+  "theme_color": "#0b3b49",
+  "description": "Mobile mechanic scheduling, jobs, customer records, and phone-native texting.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
