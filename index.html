@@ -223,7 +223,7 @@
 
         <section id="settingsView" class="view hide">
           <div class="section-head"><div><h2>Team &amp; settings</h2><p>Set up for you now, and service advisors and technicians when you hire.</p></div><button class="btn primary" id="addTeam">+ Add team member</button></div>
-          <div class="settings-layout"><article class="card settings-card"><h3>Access roles</h3><p>Everyone sees only the work they need.</p><div class="role"><div><strong>Owner</strong><span>Full business, financial, and team access</span></div><div class="status-dot on"></div></div><div class="role"><div><strong>Service advisor</strong><span>Books calls, reviews texts, manages jobs</span></div><div class="status-dot"></div></div><div class="role"><div><strong>Technician</strong><span>Sees assigned jobs, navigation, work details, photos</span></div><div class="status-dot"></div></div></article><article class="card settings-card"><h3>Connections</h3><p>Use your own phone now; add services later when they help.</p><div class="role"><div><strong>Phone texting</strong><span>Uses your phone’s Messages app. You review every message before sending.</span></div><button class="mini-link" id="phoneTextInfo">How it works</button></div><div class="role"><div><strong>QuickBooks</strong><span>Not connected — records are already structured for setup</span></div><button class="mini-link" id="qbInfo">Prepare</button></div><div class="role"><div><strong>Payments</strong><span>Card at vehicle and payment links available to set up later</span></div><button class="mini-link" id="paymentInfo">Set up</button></div></article></div>
+          <div class="settings-layout"><article class="card settings-card"><h3>Access roles</h3><p>Everyone sees only the work they need.</p><div class="role"><div><strong>Owner</strong><span>Full business, financial, and team access</span></div><div class="status-dot on"></div></div><div class="role"><div><strong>Service advisor</strong><span>Books calls, reviews texts, manages jobs</span></div><div class="status-dot"></div></div><div class="role"><div><strong>Technician</strong><span>Sees assigned jobs, navigation, work details, photos</span></div><div class="status-dot"></div></div></article><article class="card settings-card"><h3>Connections</h3><p>Use your own phone now; add services later when they help.</p><div class="role"><div><strong>Secure cloud data</strong><span>Owner sign-in keeps your records ready to use on phone and computer.</span></div><button class="mini-link" id="cloudAccount">Account</button></div><div class="role"><div><strong>Phone texting</strong><span>Uses your phone’s Messages app. You review every message before sending.</span></div><button class="mini-link" id="phoneTextInfo">How it works</button></div><div class="role"><div><strong>QuickBooks</strong><span>Not connected — records are already structured for setup</span></div><button class="mini-link" id="qbInfo">Prepare</button></div><div class="role"><div><strong>Payments</strong><span>Card at vehicle and payment links available to set up later</span></div><button class="mini-link" id="paymentInfo">Set up</button></div></article></div>
         </section>
       </div>
     </main>
@@ -231,7 +231,9 @@
 
   <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal"><div class="modal-head"><h2 id="modalTitle">New appointment</h2><button class="close" aria-label="Close" id="closeModal">×</button></div><div class="modal-body" id="modalBody"></div></div></div>
   <div class="toast" id="toast"></div>
+  <div class="auth-gate" id="authGate" aria-live="polite"><div class="auth-card" id="authCard"></div></div>
 
+  <script src="config.js"></script>
   <script>
     const storageKey = 'roadready-mobile-ops-v2';
     const seed = {
@@ -243,10 +245,19 @@
     try { data = JSON.parse(localStorage.getItem(storageKey)) || seed; } catch { data = seed; }
     let selectedId = data.appointments[0]?.id;
     let currentView = 'dashboard';
+    const cloudApiBase = String(window.ROADREADY_API_BASE || '').replace(/\/$/, '');
+    let session = { authenticated: false, setupRequired: false, email: '', loading: Boolean(cloudApiBase), error: '' };
+    let cloudSaveTimer;
     const dollar = n => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n || 0));
     const today = '2026-09-08';
     const escape = value => String(value ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[c]);
-    const save = () => localStorage.setItem(storageKey, JSON.stringify(data));
+    const save = () => {
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      if (cloudApiBase && session.authenticated) {
+        clearTimeout(cloudSaveTimer);
+        cloudSaveTimer = setTimeout(() => saveBusinessDataToCloud(), 350);
+      }
+    };
     const getSelected = () => data.appointments.find(a => a.id === selectedId) || data.appointments[0];
     const appointmentOrder = (a, b) => {
       const minutes = value => { const match = String(value).match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i); if (!match) return 0; let hours = Number(match[1]) % 12; if (match[3].toUpperCase() === 'PM') hours += 12; return hours * 60 + Number(match[2]); };
@@ -255,6 +266,99 @@
     const openMaps = a => { if (!a) return; window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(a.address), '_blank', 'noopener'); };
     const toast = message => { const el = document.getElementById('toast'); el.textContent = message; el.classList.add('show'); clearTimeout(window.toastTimer); window.toastTimer = setTimeout(() => el.classList.remove('show'), 2900); };
     const statusClass = status => status === 'Confirmed' ? 'confirmed' : status === 'Needs approval' ? 'approval' : status === 'Paid' ? 'confirmed' : 'scheduled';
+    let cloudSyncProblem = false;
+    const renderAll = () => { renderDashboard(); renderSchedule(); renderJobs(); renderCustomers(); renderReports(); };
+    const normalizedData = value => ({
+      appointments: Array.isArray(value?.appointments) ? value.appointments : [],
+      messages: Array.isArray(value?.messages) ? value.messages : [],
+      payments: Array.isArray(value?.payments) ? value.payments : []
+    });
+    async function cloudRequest(path, options = {}) {
+      if (!cloudApiBase) throw new Error('Cloud sign-in is not configured yet.');
+      const headers = { ...(options.headers || {}) };
+      if (options.body) headers['Content-Type'] = 'application/json';
+      let response;
+      try {
+        response = await fetch(cloudApiBase + path, { ...options, headers, credentials: 'include' });
+      } catch (_) {
+        throw new Error('RoadReady could not reach the secure data service. Check your connection and try again.');
+      }
+      let payload = {};
+      try { payload = await response.json(); } catch (_) { /* A non-JSON error still gets a clear message below. */ }
+      if (!response.ok) throw new Error(payload.error || 'RoadReady could not complete that request. Please try again.');
+      return payload;
+    }
+    async function saveBusinessDataToCloud() {
+      if (!cloudApiBase || !session.authenticated) return false;
+      try {
+        await cloudRequest('/api/business-data', { method: 'PUT', body: JSON.stringify({ data }) });
+        cloudSyncProblem = false;
+        return true;
+      } catch (error) {
+        console.warn('RoadReady cloud save failed:', error.message);
+        if (!cloudSyncProblem) toast('Saved on this device. Cloud saving will retry when you make your next update.');
+        cloudSyncProblem = true;
+        return false;
+      }
+    }
+    async function loadBusinessDataFromCloud() {
+      const result = await cloudRequest('/api/business-data');
+      data = normalizedData(result.data);
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      selectedId = data.appointments[0]?.id;
+      renderAll();
+    }
+    function renderAuthGate() {
+      const gate = document.getElementById('authGate');
+      const card = document.getElementById('authCard');
+      if (!cloudApiBase || session.authenticated) { gate.classList.add('hide'); return; }
+      gate.classList.remove('hide');
+      if (session.loading) {
+        card.innerHTML = '<div class="auth-brand"><div class="brand-mark">↗</div>RoadReady</div><h1>Securing your workspace</h1><p>Checking your owner account…</p>';
+        return;
+      }
+      if (session.error) {
+        card.innerHTML = `<div class="auth-brand"><div class="brand-mark">↗</div>RoadReady</div><h1>Could not reach secure data</h1><p>${escape(session.error)}</p><div class="modal-foot"><button class="btn primary" id="retryCloud">Try again</button></div>`;
+        document.getElementById('retryCloud').addEventListener('click', startCloudSession);
+        return;
+      }
+      const setup = session.setupRequired;
+      card.innerHTML = `<div class="auth-brand"><div class="brand-mark">↗</div>RoadReady</div><h1>${setup ? 'Create the owner account' : 'Welcome back'}</h1><p>${setup ? 'Create the one owner sign-in that protects and shares your RoadReady customer records.' : 'Sign in to your shared RoadReady workspace.'}</p><form id="authForm" class="form-grid"><div class="field full"><label>Email address</label><input name="email" type="email" autocomplete="email" required /></div><div class="field full"><label>Password</label><input name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" minlength="12" required /></div>${setup ? '<div class="field full"><label>Private setup code</label><input name="setupCode" type="password" autocomplete="off" minlength="16" required /><small style="color:var(--muted);font-size:11px">Use the private code from your RoadReady setup.</small></div>' : ''}<div class="field full"><button class="btn primary" type="submit" id="authSubmit">${setup ? 'Create secure workspace' : 'Sign in'}</button><div class="form-message" id="authMessage"></div></div></form>`;
+      document.getElementById('authForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const submit = document.getElementById('authSubmit');
+        const message = document.getElementById('authMessage');
+        const hadLocalData = data.appointments.length || data.messages.length || data.payments.length;
+        submit.disabled = true; submit.textContent = setup ? 'Creating…' : 'Signing in…'; message.textContent = '';
+        try {
+          const result = await cloudRequest(setup ? '/api/auth/setup' : '/api/auth/login', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) });
+          session = { authenticated: true, setupRequired: false, email: result.email || String(form.get('email') || ''), loading: false, error: '' };
+          renderAuthGate();
+          if (setup && hadLocalData) {
+            if (await saveBusinessDataToCloud()) toast('Your existing RoadReady data is now secured in your shared workspace.');
+          } else {
+            await loadBusinessDataFromCloud();
+            toast('Signed in to your shared RoadReady workspace.');
+          }
+        } catch (error) {
+          message.textContent = error.message;
+          submit.disabled = false; submit.textContent = setup ? 'Create secure workspace' : 'Sign in';
+        }
+      });
+    }
+    async function startCloudSession() {
+      if (!cloudApiBase) { session.loading = false; renderAuthGate(); return; }
+      session.loading = true; session.error = ''; renderAuthGate();
+      try {
+        const result = await cloudRequest('/api/auth/status');
+        session = { authenticated: Boolean(result.authenticated), setupRequired: Boolean(result.setupRequired), email: result.email || '', loading: false, error: '' };
+        if (session.authenticated) await loadBusinessDataFromCloud();
+      } catch (error) {
+        session = { authenticated: false, setupRequired: false, email: '', loading: false, error: error.message };
+      }
+      renderAuthGate();
+    }
     function navigate(view) {
       currentView = view;
       document.querySelectorAll('.view').forEach(el => el.classList.toggle('hide', el.id !== view + 'View'));
@@ -336,6 +440,16 @@
     }
     function paymentForm(a=getSelected()) { if (!a) return; const balance=Math.max(0,a.total-a.paid); if (!balance) { a.status='Paid'; save(); renderJobs(); renderDashboard(); return toast('Job marked complete and paid.'); } openModal('Collect payment', `<div class="manual-banner">Choose how the customer pays. The app can later connect this to your payment provider.</div><div class="form-grid" style="margin-top:15px"><div class="field"><label>Customer</label><input value="${escape(a.customer)}" disabled></div><div class="field"><label>Balance due</label><input value="${dollar(balance)}" disabled></div><div class="field"><label>Amount received</label><input id="payAmount" type="number" min="0.01" max="${balance}" step="0.01" value="${balance.toFixed(2)}" /></div><div class="field"><label>Payment method</label><select id="payMethod"><option>Card at vehicle</option><option>Text payment details</option><option>Cash</option><option>Check</option></select></div></div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" id="recordPayment">Record payment</button></div>`); document.getElementById('recordPayment').addEventListener('click',()=>{ const amount=Number(document.getElementById('payAmount').value); if(!amount || amount>balance) return toast('Enter an amount up to the balance due.'); const method=document.getElementById('payMethod').value; if(method==='Text payment details') { closeModal(); textForm(a,'payment'); return; } a.paid=Number(a.paid)+amount; if(a.paid>=a.total) a.status='Paid'; data.payments.push({appointmentId:a.id,amount,method,date:today}); save(); renderDashboard(); renderJobs(); renderReports(); renderCustomers(); closeModal(); toast(dollar(amount)+' recorded by '+method+'.'); }); }
     function infoModal(type) { const messages={ qb:['QuickBooks connection','When you choose QuickBooks, you’ll connect the account, map your sales and tax accounts, then transfer/sync customers, invoices, payments, and line items. This prototype has the data fields in place; live sync is the next build step.'], payment:['Payment setup','Connect a payment provider when you are ready. It will support a card reader at the vehicle and secure payment links by text, with payment results saved to the matching job.'], phone:['Phone texting','RoadReady fills in the customer and message, then opens your phone’s regular Messages app. You review it there and tap Send yourself. This uses your normal phone number and texting plan.'] }; const [title,body]=messages[type]; openModal(title,`<p style="margin:0;color:#4e5e66;line-height:1.6">${body}</p><div class="modal-foot"><button class="btn primary" data-close>Got it</button></div>`); }
+    function cloudAccountModal() {
+      if (!cloudApiBase) return openModal('Secure cloud data', '<p style="margin:0;color:#4e5e66;line-height:1.6">Cloud sign-in is being set up. Until then, this browser keeps its own local RoadReady data.</p><div class="modal-foot"><button class="btn primary" data-close>Got it</button></div>');
+      if (!session.authenticated) return openModal('Secure cloud data', '<p style="margin:0;color:#4e5e66;line-height:1.6">Sign in to use your shared RoadReady data on this device.</p><div class="modal-foot"><button class="btn primary" data-close>Got it</button></div>');
+      openModal('Owner account', `<p style="margin:0;color:#4e5e66;line-height:1.6">Signed in as <strong>${escape(session.email)}</strong>. Your RoadReady records are saved to the shared workspace.</p><div class="modal-foot"><button class="btn" data-close>Keep working</button><button class="btn primary" id="signOut">Sign out</button></div>`);
+      document.getElementById('signOut').addEventListener('click', async () => {
+        try { await cloudRequest('/api/auth/logout', { method: 'POST', body: '{}' }); } catch (_) { /* Clear the current device either way. */ }
+        session = { authenticated: false, setupRequired: false, email: '', loading: false, error: '' };
+        closeModal(); renderAuthGate();
+      });
+    }
     function exportReport() { const rows=[['RoadReady Business Report'],['Generated',new Date().toLocaleString()],[],['Customer','Vehicle','Service','Total','Paid','Balance','Status']]; data.appointments.forEach(a=>rows.push([a.customer,a.vehicle,a.service,a.total,a.paid,Math.max(0,a.total-a.paid),a.status])); const csv=rows.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv'}); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='roadready-business-report.csv'; link.click(); URL.revokeObjectURL(link.href); toast('Report exported for your records.'); }
     document.addEventListener('click', e=>{
       const nav=e.target.closest('[data-view]'); if(nav) return navigate(nav.dataset.view);
@@ -353,10 +467,11 @@
       if(e.target.closest('#exportReport')) return exportReport();
       if(e.target.closest('#newCustomer')) return appointmentForm();
       if(e.target.closest('#addTeam')) return toast('Team-member invitations are ready for the next build phase.');
+      if(e.target.closest('#cloudAccount')) return cloudAccountModal();
       if(e.target.closest('#phoneTextInfo')) return infoModal('phone');
       if(e.target.closest('#qbInfo')) return infoModal('qb'); if(e.target.closest('#paymentInfo')) return infoModal('payment');
     });
-    renderDashboard(); renderSchedule(); renderJobs(); renderCustomers(); renderReports();
+    renderAll(); renderAuthGate(); startCloudSession();
     if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   </script>
 </body>
