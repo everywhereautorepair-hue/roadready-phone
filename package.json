@@ -1,0 +1,15 @@
+{
+  "name": "roadready-cloud-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "RoadReady owner authentication and encrypted-in-transit cloud data API.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}
